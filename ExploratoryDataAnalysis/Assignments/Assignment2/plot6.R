@@ -15,8 +15,11 @@ joinedData = join(baltimoreAndLAEmissionsData, motorVehiclesGroup, by=c("SCC"),t
 
 #joinedEmissionsData = joinedData[, list(totalEmissions = sum(Emissions)), by = c("EI.Sector","fips","year")]
 joinedEmissionsData = joinedData[, list(totalEmissions = sum(Emissions)), by = c("fips","year")]
+joinedEmissionsData$city[joinedEmissionsData$fips=="24510"] = "Baltimore"
+joinedEmissionsData$city[joinedEmissionsData$fips=="06037"] = "Los Angeles"
+
 png('plot6.png')
-p6 = ggplot(data=joinedEmissionsData, aes(x=year, y=totalEmissions, colour=fips)) 
+p6 = ggplot(data=joinedEmissionsData, aes(x=year, y=totalEmissions, colour=city)) 
 p6 = p6 + geom_line(aes(group=fips)) +  geom_point(size=3)
 p6 = p6 + labs(title="plot6 -  compare vehicle total emissions in Baltimore and LA")
 p6 = p6 + scale_fill_continuous(guide = guide_legend()) + theme(legend.direction = "vertical", legend.position="bottom")
