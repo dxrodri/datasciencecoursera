@@ -1,0 +1,60 @@
+---
+title: "Stastical Inference - Assignment 1 - Part 1"
+author: "DomR"
+date: "Saturday, September 13, 2014"
+output: pdf_document
+---
+
+## Part 1
+The exponential distribution can be simulated in R with rexp(n, lambda) where lambda is the rate parameter. The mean of exponential distribution is 1/lambda and the standard deviation is also also 1/lambda. Set lambda = 0.2 for all of the simulations. In this simulation, you will investigate the distribution of averages of 40 exponential(0.2)s. Note that you will need to do a thousand or so simulated averages of 40 exponentials.
+
+* Illustrate via simulation and associated explanatory text the properties of the distribution of the mean of 40 exponential(0.2)s.  You should
+    1. Show where the distribution is centered at and compare it to the theoretical center of the distribution.
+    2. Show how variable it is and compare it to the theoretical variance of the distribution.
+    3. Show that the distribution is approximately normal.
+    4. Evaluate the coverage of the confidence interval for 1/lambda: X¯±1.96Sn.
+#### Data Preparation
+```{r, echo=FALSE,message=FALSE}
+require(plyr)
+require(ggplot2)
+require(lattice)
+require(lubridate)
+require(gridExtra)
+```
+```{r, echo=TRUE}
+set.seed(1000)
+lambda <- 0.2
+noOfSimulations <- 1000
+noOfObservations <-  40
+
+```
+- Run `r noOfSimulations` simulations to calculate mean of `r noOfObservations` observations with a rate parameter of  `r lambda`.
+
+```{r, echo=TRUE}
+exponentialsMean <- data.frame(sapply(1:noOfSimulations,function(s) mean(rexp(noOfObservations,lambda))))
+colnames(exponentialsMean)[1] =  c("means")
+simulatedMean <- mean(exponentialsMean$means)
+simulatedMean
+simulatedStdDeviation <- sd(exponentialsMean$means)
+simulatedVariance <- simulatedStdDeviation^2
+simulatedVariance
+expectedMean <- 1/lambda
+expectedMean
+expectedStdDeviation <- 1/(lambda)/sqrt(noOfObservations)
+expectedVariance <- expectedStdDeviation ^2
+expectedVariance
+```
+#### Answers
+  1. Exponential distribution is centered at `r simulatedMean` which is close to expected mean  of `r expectedMean`
+  2. Simulated variance of the distrubution is `r simulatedVariance` which is close to expected variance of `r expectedVariance`
+  3. Showing historam of simulated means which shows the distribution is centered around `r expectedMean`
+  
+```{r, echo=TRUE}
+    hist(exponentialsMean$means, col="red",main="Exponential Distribution")
+```
+  4. 95% Confidence Interval: simulatedMean +/- 1.96* std error
+```{r, echo=TRUE}
+  standardError <- simulatedStdDeviation/sqrt(noOfSimulations)
+  confidenceInterval <-   simulatedMean + c(-1,1) * 1.96 * standardError
+  confidenceInterval
+```
