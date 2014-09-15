@@ -1,0 +1,150 @@
+---
+title: "What factors affect fuel effiency of a car?"
+author: "DomR"
+date: "Saturday, September 13, 2014"
+output: pdf_document
+---
+
+## Executive Summary
+This report analyis data from 32 1973-1974 model cars and tries to explore if there are other factors other than transmission type that can be used to predict fuel efficiency of a car.
+
+* This report specially tries to answer the following questions:
+    + Is an automatic or manual transmission better for MPG?
+    + Quantify the MPG difference between automatic and manual transmissions
+    
+    
+## Data Preparation
+```{r, echo=TRUE,message=FALSE}
+require(MASS)
+require(plyr)
+require(ggplot2)
+require(lattice)
+require(knitr)
+options("scipen"=100, "digits"=4)
+opts_chunk$set(fig.width=7, fig.height=5, tidy=FALSE, size='small',width=100 )
+```
+
+### Load the data
+
+```{r, echo=TRUE}
+data(mtcars)
+#Convert factor variables into factors
+mtcars$cyl <- as.factor(mtcars$cyl) #4, 6 or 8
+mtcars$vs <- as.factor(mtcars$vs) #0- V engine or 1= straight engine. 
+mtcars$am <- as.factor(mtcars$am) #0 - automatic and 1 - gear
+mtcars$gear <- as.factor(mtcars$gear) #3,4,5
+mtcars$carb <- as.factor(mtcars$carb) #1,2,3,4
+```
+
+## Exploratory Data Analysis
+
+### Base model using am as the only predictor variable keeping all other factors constant
+```{r, echo=TRUE}
+baseFit <- lm(mpg~am, data=mtcars)
+summary(baseFit)
+autoSummary <- summary(subset(mtcars, am==0)$mpg)
+manualSummary <- summary(subset(mtcars, am==1)$mpg)
+```
+* The mean, median, minimum and maximum mpg (see also Figure 1 in Appendix) for 
+    + automatic cars  is `r autoSummary["Mean"]`,`r autoSummary["Median"]`,`r autoSummary["Min."]` and `r autoSummary["Max."]` respectively.
+    + manual cars is `r manualSummary["Mean"]`,`r manualSummary["Median"]`,`r manualSummary["Min."]` and `r manualSummary["Max."]` respectively.
+
+*  The manual tranmission ( am1) cars provide additional **7.245** miles per gallon of gas compared to automatic cars. However, adjusted R-squared value is only `r summary(baseFit)$adj.r.squared`. _Is there a better model than the baseFit?_
+
+### Identify the best model to predict miles per gallon for a car.
+```{r, echo=TRUE, results="hide"}
+#Get a lm fit of mpg against all other factors
+lmFit <- lm(mpg~., data=mtcars)
+#Perform a step wise model selection of mpg versus other factors
+steplmFit <- stepAIC(lmFit, direction="both")
+steplmFit$anova
+```
+```{r, echo=TRUE}
+attr(terms(steplmFit),"term.label")
+```
+* As shown, the significant predictor variables to predict mpg outcome is `r attr(terms(steplmFit),"term.label")` and the best Fit model is
+```{r, echo=TRUE}
+bestFitWithCylHpWtAm <- lm(mpg~cyl + hp + wt + am, data=mtcars)
+summary(bestFitWithCylHpWtAm)
+```
+*  Adjusted R-square for best fit model is `r summary(bestFitWithCylHpWtAm)$adj.r.squared` which is much better than base model. How much transmission type has effect on mpg? Let's build multiple models with cyl, hp and wt as predictor variables.
+
+### How much does transmission type really impacts mpg?
+####  Build few models model without using am as predictor variable
+
+```{r, echo=TRUE}
+bestFitWithCylHpWt <- lm(mpg~cyl + hp + wt, data=mtcars)
+#summary(bestFitWitCylHpWt)
+bestFitWithCylWt <- lm(mpg~cyl + wt, data=mtcars)
+#summary(bestFitWithCylWt)
+bestFitWithWt <- lm(mpg~wt, data=mtcars)
+#summary(bestFitWithWt)
+bestFitWithCyl <- lm(mpg~cyl, data=mtcars)
+#summary(bestFitWithCyl)
+
+rSquaredValues <- rbind(
+c("Model : mpg~cyl + hp + wt + am",summary(bestFitWithCylHpWtAm)$adj.r.squared),
+c("Model : mpg~cyl + hp + wt ",summary(bestFitWithCylHpWt)$adj.r.squared),
+c("Model : mpg~cyl + wt",summary(bestFitWithCylWt)$adj.r.squared),
+c("Model : mpg~wt",summary(bestFitWithWt)$adj.r.squared),
+c("Model : mpg~cyl ",summary(bestFitWithCyl)$adj.r.squared)
+)
+colnames(rSquaredValues ) <-c("Model", "Adj. R-Squared")
+```
+*  Adjusted R-square for the new models 
+```{r, echo=TRUE}
+rSquaredValues
+```
+Let's further analyze these models using anova.
+
+#### Compare models using pValues
+```{r, echo=TRUE}
+modelCompare <- anova(bestFitWithCylHpWtAm, bestFitWithCylHpWt,bestFitWithCylWt,bestFitWithWt,bestFitWithCyl)
+modelCompare
+```
+  + As seen above from pValues, model differences between _bestFitWithCylHpWtAm_ and _bestFitWitCylHpWt_ is  not significant ( pValue of 0.206 > 0.05 (95% confidence level), Null hypothesis of models been equal cannot be rejected). Model differences between _bestFitWithCylHpWt_ and _bestFitWithCylWt_ is also not significant( pValue of 0.06 > 0.05). However, model differences bestFitWithCylWt and bestFitWithWt are significant (pValue of 0.001733 > 0.05 and hence Null hypothesis of models been same can be rejected). Also, rValue of model _bestFitWithCylWt_ (.82) is much higher than that of _bestFitWithWt_ (0.74).  Since we prefer a model with least number of predictor variables, we can conclude model _bestFitWithCylWt_ (with cylinder and weigth) is the best model for predicting fuel efficiency rather than tramission type.
+
+### Quantity mpg differences between automatic and manual cars
+
+Let's add _am_ to the best model _bestFitWithCylWt_
+```{r, echo=TRUE}
+bestFitWithCylWtAm <- lm(mpg~cyl + wt+am, data=mtcars)
+summary(bestFitWithCylWtAm)
+```
+As seen from above, the manual cars get  just **0.150** additional miles per gallon when number of cylinders and weight of a car are taken into consideration.
+
+### Residual Analysis
+#### Residual analysis for model _bestFitWithCylWt_ using wt and cyl as predictor variables
+
+```{r, echo=TRUE}
+bestFitWithCylWt$residuals
+```
+Toyoto Corolla (5.79 ), Fiat 128 (5.46), Chrysler Imperial(3.91), Toyoto Corona (-4.58) ( see also Figure 2 in the Appendix) are the outliers in the dataset with either very high/low efficieny which will have an effect of using model _bestFitWithCylWt_ for prediction.
+
+
+## Conclusion
+
+Using _baseFit_ with only transmission type as the predictor variable shows that manual tranmission type cars achieve higher efficiency of  **7.2** miles per gallon than automatic cars. However, as shown above, transmission type is a not a good predictor for fuel efficiency, but rather weight and number of cylinders of a car. Taking number of cylinders and weight into consideration, manual cars provide just **0.15** additional miles per gallon than automatic cars.
+
+
+---
+
+## Appendix
+
+### Figure 1 showing a boxplot comparing mpg for automatic and manual transmission cars
+```{r, echo=TRUE}
+with(mtcars,{
+     boxplot(mpg ~ am, 
+             ylab = "miles per gallon",
+             xlab = "0 - auto, 1 - manual",
+             main = "Fig. 1 - mpg for auto and manual tramission cars")
+    abline(baseFit, col="red")
+     })
+```
+
+### Figure 2 showing diagnostic plots for best model ( mpg ~ cyl  + wt).
+
+```{r, echo=TRUE}
+par(mfrow = c(2,2))
+plot(bestFitWithCylWt)
+```
