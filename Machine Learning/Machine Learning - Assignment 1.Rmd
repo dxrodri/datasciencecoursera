@@ -1,0 +1,182 @@
+---
+title: "It's not how much, but how well you exercise!"
+author: "DomR"
+date: "Saturday, September 13, 2014"
+output: html_document
+
+---
+  
+## Executive Summary
+  This report analyis data from Human Activity Recognition dataset [HAR](http://groupware.les.inf.puc-rio.br/har). The dataset consists data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. The participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. This report tries to predict the manner the outcome of an exercise based on accelerometers using machine learning techniques.
+  
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+## Data Preparation
+```{r, echo=TRUE,message=FALSE}
+require(plyr)
+require(caret)
+require(knitr)
+options("scipen"=100, "digits"=4)
+opts_chunk$set(fig.width=7, fig.height=5, tidy=FALSE, size='small',width=100 )
+set.seed(1000)
+```
+
+### Load the data
+
+```{r, echo=TRUE}
+trainingRaw <- read.csv("pml-training.csv", na.strings = c("NA",",",""))
+testingRaw  <- read.csv("pml-testing.csv", na.strings = c("NA",".",""))
+```
+
+### Filter and clean data
+*  Build a raw set of parameters that will be used to build the models
+```{r, echo=TRUE}
+#Drop first seven columns from training dataset as it contains metadata which is not relevant for building the models.
+
+trainingRawFiltered <- trainingRaw[,-which(colnames(trainingRaw) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window"))]
+
+# Filter out all columns which has NA data in more than 95% of the time. Raw analysis shows that about 100 columns have over 95% NA values
+NAthreshold <- nrow(trainingRawFiltered) * 0.95
+trainingRawFiltered1 <- trainingRawFiltered[,apply(trainingRawFiltered,2, function(x) sum(is.na(x)) < NAthreshold)]
+noOfColumns = length(colnames(trainingRawFiltered1))
+
+# This will select about 53 columns for further analysis
+
+# Replace any missing NA values with the average
+imputeWithMean <- function(x) {
+    z <- mean(x, na.rm = TRUE)
+    x[is.na(x)] <- z
+    return(x)
+}
+#skip classe column for imputing as this function converts factors into numeric
+trainingRawFiltered2 <- sapply(trainingRawFiltered1[,-noOfColumns], function(x){
+    if(is.numeric(x) & any(is.na(x))){imputeWithMean(x)}else{ x  }
+})
+trainingRawFiltered2 = data.frame(trainingRawFiltered2)
+trainingRawFiltered2 <- cbind(trainingRawFiltered2,trainingRawFiltered1[,noOfColumns ])
+colnames(trainingRawFiltered2)[noOfColumns] = 'classe'
+
+#Convert factor variables into factors, if any
+```
+
+* Create training and test dataset
+```{r, echo=TRUE}
+# create training  and cross-validation set (70% and 20% )
+inTrain <- createDataPartition(trainingRawFiltered2$classe, p = 0.7)[[1]]
+training <- trainingRawFiltered2[inTrain,]
+validation <- trainingRawFiltered2[-inTrain,]
+```
+
+## Exploratory Data Analysis
+### Build Predictive Models using bootstrap and cross validation resampling
+* We are going to build two classification tree models using rpart and rf(randomforest) functions in  caret package as we will use these models to predict a category outcome _Classe_ based on test data. _Rpart_ model (faster) will use boostrap resampling whereas _randomforest_ model (slower) will use 4 fold cross validation resampling technique. Both models will use 52 predictor variables as selected above to predict the _classe_ outcome given accelerometers reading.
+
+
+```{r, echo=TRUE,message=FALSE}
+#Bootstap resampling
+trainedModel_rpart <- train(training$classe ~ ., method = "rpart", data = training)
+
+#4 fold cross validation resampling
+trainedModel_rf <- train(training$classe ~ ., method = "rf",  
+    data = training, trControl = trainControl(method = "cv", number = 4))
+```
+
+### Analyze models
+* Predictive model using boostrap sampling(_rpart_) selected an optimal model with a cost complexity of 0.032 (approx.) with a kappa value of 0.3799 (approx.)
+
+```{r,echo=TRUE} 
+trainedModel_rpart
+```
+
+* Predictive model using cross validating sample(_rf_) selected an optimal model with 27 predictor variables/features at each tree with a kappa value of 0.987 (approx.) 
+```{r,echo=TRUE}
+trainedModel_rf
+```
+### Predict and Validate models
+#### Predict and validate models against the training set itsef
+* Using Bootstrap resampling technique
+```{r, echo=TRUE}
+predict_rpart_itself <- predict(trainedModel_rpart, training)
+```
+* Using 4 fold cross validation resampling technique
+```{r, echo=TRUE}
+predict_rf_itself <- predict(trainedModel_rf, training)
+```
+
+#### Calculate the misclassification rate of model validated against itself
+
+* Using Bootstrap
+```{r,echo=TRUE}
+confMatrix_rpart_itself <-confusionMatrix(predict_rpart_itself, training$classe)
+confMatrix_rpart_itself
+```
+* Using 4 fold cross validation
+```{r, echo=TRUE}
+confMatrix_rf_itself <-confusionMatrix(predict_rf_itself, training$classe)
+confMatrix_rf_itself
+```
+#### Calculate in-sample error rates of model validated against itself.
+* Using Bootstrap
+```{r,echo=TRUE}
+inSampleError_rpart <- sum(predict_rpart_itself  != training$classe)/nrow(training)
+inSampleError_rpart
+```
+* Using 4 fold cross validation
+```{r,echo=TRUE}
+inSampleError_rf <- sum(predict_rf_itself  != training$classe)/nrow(training)
+inSampleError_rf
+```
+
+* In sample error is **`r inSampleError_rpart *100`% ** for _rpart_ model and **`r inSampleError_rf *100`%**  for _rf_ model
+
+* As seen above, accuracy of model using bootstrap resampling model (_rpart_) is around 49% compared to 100% for _rf_ model when using the training data itself for validation. Kappa value of _rf _model is 1 compared to 0.345 for _rpart_ model. Hence, we will use random forest _rf_ model for further analysis.
+
+#### Predict and validate random forest model against the cross validation set
+* Using 4 fold cross validation
+```{r, echo=TRUE}
+predict_rf_validation <- predict(trainedModel_rf, validation)
+```
+* Calculate the misclassification/error rate for random forest model with validation data set using confusionMatrix function
+```{r, echo=TRUE}
+confMatrix_rf_validation <-confusionMatrix(predict_rf_validation, validation$classe)
+confMatrix_rf_validation
+```
+* Calculate out of sample error rate for rf model
+```{r,echo=TRUE}
+outOfSampleError <- sum(predict_rf_validation  != validation$classe)/nrow(validation)
+outOfSampleError
+```
+* Out of sample error for _rf_ model is `r outOfSampleError *100`%
+
+* As seen above, the random forest model prediction accuracy is almost 100% against the training set with Sensitivity (few false negatives) for class A,B,C,D and E at 99.76%, 98.95%, 98.83%, 98.76% and 99.45% (approximate values) respectively and Specivity(few false postive) for class A,B,C,D and E at 99.76%,99.71%, 99.71%, 99.88% and 99.96% (approximate values) respectively.
+
+
+## Conclusion
+
+A predictive model built using randomForest algorithm with 4 fold cross validation is able to predict _classe_ outcome with almost 100% accuracy with high sensitivity and specivity.
+
+---
+
+## Appendix
+### Figure 1. Random forest predictive model plot shows decrease in error rates as number of trees increase
+```{r, echo=TRUE}
+finalModel <- trainedModel_rf$finalMode
+plot(finalModel,main="Random forest optimal model")
+```
+
+### Figure 2. Random forest predictive model plot shows importance of various predictors
+```{r, echo=TRUE}
+barplot(finalModel$importance[, 1], main = "Importance")
+```
+
+### Testing the model
+```{r, echo=TRUE, eval=FALSE}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+answers  <- predict(trainedModel_rf, testingRaw)
+pml_write_files(answers)
