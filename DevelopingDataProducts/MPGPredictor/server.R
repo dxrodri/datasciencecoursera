@@ -27,7 +27,7 @@ shinyServer(function(input, output, session) {
        mymtcars1 <- rbind(mymtcars,c("**** New Car ****",newmpg,input$wt,input$cyl,input$am))
        mymtcars1 <- mymtcars1[order(as.numeric(mymtcars1$mpg)),]
        mymtcars1$desc <- as.character(paste0(ifelse(mymtcars1$am == 0, 'Automatic', 'Manual'), "<br>",
-			"Wt: ", data$wt, "<br>", "Cyl: ", data$cyl))
+			"Wt: ", mymtcars1$wt, "<br>", "Cyl: ", mymtcars1$cyl))
        mymtcars1
  })
   

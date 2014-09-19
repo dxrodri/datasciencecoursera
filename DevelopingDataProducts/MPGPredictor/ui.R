@@ -1,3 +1,6 @@
+require(shiny)
+require(ggvis)
+
 shinyUI(
  pageWithSidebar(
   headerPanel("MPG Predictor!"),
