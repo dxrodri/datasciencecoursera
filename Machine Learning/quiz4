@@ -1,0 +1,102 @@
+Q1:
+library(ElemStatLearn)
+data(vowel.train)
+data(vowel.test) 
+set.seed(33833)
+vowel.train$y = as.factor(vowel.train$y)
+vowel.test$y = as.factor(vowel.test$y)
+train_gbm=train(y~.,method="gbm", data=vowel.train)
+train_rf=train(y~.,method="rf", data=vowel.train)
+predict_gbm = predict(train_gbm, vowel.test)
+predict_rf = predict(train_rf, vowel.test)
+cf_gbm = confusionMatrix(predict_gbm,vowel.test$y)
+cf_rf = confusionMatrix(predict_rf,vowel.test$y)
+
+matchIndex <- which(predict_gbm == predict_rf)
+sum(pred.rf[matchIndex] == vowel.test[matchIndex,]$y)/length(matchIndex)
+
+#alt.
+matchSubset = vowel.test[predict_gbm == predict_rf,]
+predict_combined = predict(train_rf, matchSubset)
+sum(predict_combined == matchSubset$y) / length(predict_combined)
+
+
+Q2.
+library(caret)
+library(gbm)
+set.seed(3433)
+library(AppliedPredictiveModeling)
+data(AlzheimerDisease)
+adData = data.frame(diagnosis,predictors)
+inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
+training = adData[ inTrain,]
+testing = adData[-inTrain,]
+
+training_gbm=train(diagnosis~.,method="gbm", data=training)
+training_rf=train(diagnosis~.,method="rf", data=training)
+training_lda=train(diagnosis~.,method="lda", data=training)
+
+predicting_train_gbm = predict(training_gbm, training)
+predicting_train_rf = predict(training_rf, training)
+predicting_train_lda = predict(training_lda, training)
+
+combinedData = data.frame(rf = predicting_train_rf, gbm = predicting_train_gbm, lda = predicting_train_lda, diagnosis = training$diagnosis)
+combinedModel = train(diagnosis ~ ., method = 'rf', data = combinedData)
+
+predicting_test_gbm = predict(training_gbm, testing)
+predicting_test_rf = predict(training_rf, testing)
+predicting_test_lda = predict(training_lda, testing)
+
+combinedDataTest = data.frame(rf = predicting_test_rf, gbm = combinedDataTest, lda = predicting_test_lda, diagnosis = testing$diagnosis)
+combinedTestModel_train = train(diagnosis ~ ., method = 'rf', data = combinedDataTest)
+combinedTestModel_predict= predict(combinedModel, combinedDataTest)
+
+accuracyRf = sum(predicting_test_rf == testing$diagnosis)/length(predicting_test_rf)
+accuracyGbm = sum(predicting_test_gbm == testing$diagnosis)/length(predicting_test_gbm)
+accuracyLDA = sum(predicting_test_lda == testing$diagnosis)/length(predicting_test_lda)
+stacked = sum(combinedTestModel_predict == testing$diagnosis)/length(combinedTestModel_predict)
+
+
+Q3.
+set.seed(3523)
+library(AppliedPredictiveModeling)
+data(concrete)
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+training = concrete[ inTrain,]
+testing = concrete[-inTrain,]
+testing$visitsTumblr
+training_lasso = train(CompressiveStrength ~ ., method = 'lasso', data = training)
+plot.enet(training_lasso$finalMode, xvar="penalty",use.color=TRUE)
+
+#Cement??
+
+Q4.
+
+library(lubridate)  # For year() function below
+dat = read.csv("gaData.csv")
+training = dat[year(dat$date) < 2012,]
+testing = dat[(year(dat$date)) > 2011,]
+tstrain = ts(training$visitsTumblr)
+
+train_fit <-bats(tstrain)
+test_forecast<-forecast(train_fit, h=length(testing$visitsTumblr),level=c(95))
+accuracy <- sum(testing$visitsTumblr >= test_forecast$lower & testing$visitsTumblr <= test_forecast$upper)/length(testing$visitsTumblr)
+
+#96%
+
+Q5
+require(e1071)
+set.seed(3523)
+library(AppliedPredictiveModeling)
+data(concrete)
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+training = concrete[ inTrain,]
+testing = concrete[-inTrain,]
+set.seed(325 )
+train_svm_fit <- svm(CompressiveStrength~.,training)
+predict_svm <- predict(train_svm_fit,testing)
+accuracy(predict_svm,testing$CompressiveStrength)
+
+
+
+
