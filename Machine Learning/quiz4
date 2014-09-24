@@ -13,7 +13,7 @@ cf_gbm = confusionMatrix(predict_gbm,vowel.test$y)
 cf_rf = confusionMatrix(predict_rf,vowel.test$y)
 
 matchIndex <- which(predict_gbm == predict_rf)
-sum(pred.rf[matchIndex] == vowel.test[matchIndex,]$y)/length(matchIndex)
+sum(predict_rf[matchIndex] == vowel.test[matchIndex,]$y)/length(matchIndex)
 
 #alt.
 matchSubset = vowel.test[predict_gbm == predict_rf,]
