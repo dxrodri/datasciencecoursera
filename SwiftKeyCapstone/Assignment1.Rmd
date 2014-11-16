@@ -1,0 +1,210 @@
+---
+title: "Capstone Swiftykey Project - Milestone Report"
+author: "DomR" 
+date: "Saturday, November 15, 2014" 
+output: html_document
+---
+
+##Synopsis
+The goal of the Data Science project is  to build a predictive model for natural language processing(NLM). We are provided a set of three documents - twitter feed, US news feed and a blog data - that will form the basis  of corpus that will be used to predict next word given a sentence.
+
+
+---
+
+##Data Processing
+
+### Loading and preprocessing the data
+The corpus dataset that will be used for this project were downloaded from [Capstone Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). The files in the data set are en_US_twitter.txt,en_US_news.txt and en_US_blogs.txt
+
+```{r, echo=TRUE,message=FALSE}
+library(tm) 
+library(SnowballC) 
+library(dplyr) 
+library(RColorBrewer) 
+library(ggplot2)
+Sys.setenv(JAVA_HOME="")
+options( java.parameters = "-Xmx4g" )
+library(rJava)
+library(RWeka)
+require(wordcloud)
+```
+
+As the dataset is huge, we will be using connections and readLines functions to parse data in chunks. The following is the code snippet to read twitter data and some basic analysis that was done to answer Quiz 1 of this course.
+
+```{r, echo=TRUE, eval=FALSE}
+conTwitter <- file("en_US.twitter.txt", "r")
+system('wc -l en_US.twitter.txt')
+maxLength<- 0
+maxLine <- ''
+maxLinesPerIterator = 10000
+countLove <-0
+countHate <-0
+while (length(dataTwitter <- readLines(conTwitter, n = maxLinesPerIterator, warn = FALSE)) > 0) {
+  maxLocation <- which.max(nchar(dataTwitter))
+  maxLengthStep = nchar(dataTwitter[maxLocation])
+  maxLineStep <- dataTwitter[maxLocation]
+  countLove <- countLove + length(grep('love[ .?]',dataTwitter))
+  countHate <- countHate + length(grep('hate[ .?]',dataTwitter))
+  biostatsLocation <- grep('biostats', dataTwitter)
+  if(length(biostatsLocation) >0 ) {
+   print(dataTwitter[biostatsLocation])
+  }
+  sentenceLocation <- grep('A computer once beat me at chess, but it was no match for me at kickboxing', dataTwitter)
+  if(length(sentenceLocation) >0 ) {
+   print(dataTwitter[sentenceLocation])
+  }
+  if(maxLengthStep > maxLength) {
+     maxLength <- maxLengthStep
+     maxLine <- maxLineStep
+  } 
+}
+print(maxLine)
+print(maxLength)
+print(countLove/countHate)
+close(conTwitter)
+```
+#### Basic summary of data
+Here is the basic summary of  the data set
+```{r, echo=TRUE, eval=FALSE}
+system('wc corpus_complete/en_US.twitter.txt')
+system('wc corpus_complete/en_US.news.txt')
+system('wc  corpus_complete/en_US.blogs.txt')
+system('du -h corpus_complete/en_US.twitter.txt')
+system('du -h corpus_complete/en_US.news.txt')
+system('du -h  corpus_complete/en_US.blogs.txt')
+```
+* Filename:  en_US.twitter.txt
+    - Number of Lines : 2360148
+    - File Size: 160 M
+    - word count: 167105338
+* Filename:  en_US.blogs.txt
+    - Number of Lines : 899288
+    - File size: 197M
+    - word count:210160014
+* Filename:  en_US.news.txt
+    - Number of Lines : 1010242    
+    - File size: 210M
+    - word count: 205811889
+ 
+### Exploratory analysis
+##### Sampling Data
+For our prediction model, we will build multiple samples of data for training purposes. The following code generates sample data using 30% of the original dataset using sample function. The following is the code snippet that is used to read blogs data and create new sample data files.
+
+```{r, echo=TRUE, eval=FALSE}
+set.seed(1000)
+maxLinesPerIterator=10000
+sampleRatio=.30
+conUSBlogs <- file("corpus_complete\\en_US.blogs.txt", "r")
+length <- length(dataUSBlogs <- readLines(conUSBlogs, n = maxLinesPerIterator, warn = FALSE))
+while (length> 0) {
+  sampleData <- sample(dataUSBlogs,length*sampleRatio)
+  write(sampleData,"corpus_sample4/en_US.blogs_sample4.txt",append=TRUE)
+  length <- length(dataUSBlogs <- readLines(conUSBlogs, n = maxLinesPerIterator, warn = FALSE))
+}
+close(conUSBlogs)
+```
+
+##### Process and Clean Data
+The following code builds corpus of the sample data and cleans it by using tm_map function by stripping white spaces, converts to lower case, removes punctuations and numbers. At this time, we will not remove stop words as we will doing parts of speech analysis later in the course.
+
+```{r, echo=TRUE, eval=FALSE}
+cname <-file.path(".","corpus_sample4")
+corpusData <- VCorpus(DirSource(cname),readerControl=list(reader=readPlain,language="english",encoding='ANSI'))
+
+corpusData <- tm_map(corpusData, stripWhitespace)
+corpusData <- tm_map(corpusData, content_transformer(tolower))
+corpusData <- tm_map(corpusData, removeNumbers)
+corpusData <- tm_map(corpusData, removePunctuation, preserve_intra_word_dashes = TRUE)
+```
+
+##### Build  Term DocumentMatrix for Bigrams and Trigrams
+* A term document matrix is build using Weka packages and restricting word length to 45 characters so as to avoid long words and/or meaningless sentences. The term matrix is further reduced by removing sparse terms using 20% level (lower value removes more sparse words).
+
+```{r, echo=TRUE, eval=FALSE}
+UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+corpusTDMUnigrams <- TermDocumentMatrix(corpusData, control = list(wordLengths=c(2,15),tokenize = UnigramTokenizer))
+removeSparseTerms(corpusTDMUnigrams,.2)
+
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+corpusTDMBigrams <- TermDocumentMatrix(corpusData, control = list(wordLengths=c(2,45),tokenize = BigramTokenizer))
+removeSparseTerms(corpusTDMBigrams,.2)
+
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+corpusDTMTrigrams <- TermDocumentMatrix(corpusData, control = list(wordLengths=c(2,45), tokenize = TrigramTokenizer))
+removeSparseTerms(corpusTDMBigrams,.2)
+```
+
+
+## Data Analysis
+### Word Frequency Analysis
+
+
+##### Most Frequent 10 words that appear more than 10000 times in the corpus
+```{r, echo=TRUE, eval=FALSE}
+head(findFreqTerms(corpusTDMUnigrams,lowfreq=10000),10)
+```
+[1] "â???""    "about"  "after"  "again"  "all"    "also"   "always" "am"     "an"     "and"   
+
+
+##### Most Frequent 10 Bigrams that appear more than 1000 times in the corpus
+```{r, echo=TRUE, eval=FALSE}
+head(findFreqTerms(corpusTDMBigrams,lowfreq=1000),10)
+```
+[1] "a bad"       "a beautiful" "a better"    "a big"       "a bit"       "a book"      "a bunch"     "a chance"    "a couple"   
+[10] "a day"
+
+
+##### Most Frequent 10 Trigram that appear more than 1000 times in the corpus
+```{r, echo=TRUE, eval=FALSE}
+head(findFreqTerms(corpusDTMTrigrams,lowfreq=1000),10)
+```
+[1] "a bit of"     "a couple of"  "a great day"  "a little bit" "a long time"  "a lot of"     "all of the"   "all the time" "and i am"    
+[10] "and i have"
+
+### Word Correlation Analysis
+##### Find Associations between a given word (for example, 'love') and other words in the document matrix with correlation threshold of 1.00 using findAssocs function.
+
+```{r, echo=TRUE, eval=FALSE}
+findAssocs(corpusTDMUnigrams, "love", corlimit=0.99)
+```
+[subset of resultset]
+* videos               1.00
+* videotapes           1.00
+* vilify               1.00
+* vilma                1.00
+* vin                  1.00
+* vince                1.00
+* vinces               1.00
+
+#### Relationships between various words that appear atleast 1000 times with correlation threshold of 0.8
+```{r, echo=TRUE, eval=FALSE}
+plot(corpusTDMUnigrams, terms=findFreqTerms(corpusTDMUnigrams, lowfreq=1000)[10:20], corThreshold=0.8)
+```
+![Word Relationship](UnigramsPlot.png)
+
+#### Histograms of words that appear aleast 15000 times using trigrams
+```{r, echo=TRUE, eval=FALSE}
+freqBigram <- rowSums(as.matrix(corpusDTMBigrams))
+wordFrameBigram <- data.frame(word=names(freqBigram),count=freqBigram,stringsAsFactors=FALSE)
+bigramPlot <- ggplot(subset(wordFrameBigram, count > 15000), aes(word,count))
+bigramPlot <- bigramPlot + geom_bar(stat="identity")
+bigramPlot <- bigramPlot + theme(axis.text.x=element_text(angle=45, hjust=1))
+bigramPlot
+```
+![Most Common Bigrams](BigramHistogram.png)
+
+#### Word Cloud of words that appear aleast 1000 times using trigrams
+```{r, echo=TRUE, eval=FALSE}
+freqTrigram <- rowSums(as.matrix(corpusDTMTrigrams))
+wordFrameTrigram <- data.frame(word=names(freqTrigram),count=freqTrigram,stringsAsFactors=FALSE)
+wordcloud(wordFrameTrigram$word, wordFrameTrigram$count, min.freq=1000, colors=brewer.pal(8,"Dark2"))
+```
+![Most Common Trigram](TrigramWordCloud.png)
+---
+
+## Data Modeling
+After building the term document matrix, we will apply  smoothing techniques to discount the probabilities of existing terms to account for the words that currrently don't exist in the corpus. Different smoothing techniques such as Maximum Likelihood Estimate(MLE), Laplace Smoothing and Simple Good Turing techniques will be evaluated taking into consideration the size of the corpus and the available hardware to process the data. After smoothing of data, we will use only the last few words in the sentence to predict the next word based on Markov's concept and using smoothed probabilities.
+
+
+## Data Presentation
+Once data modeling is complete and sentence context is taken into consideration, the next step would be build an application using Shiny that will mimic SwitfKey app to predict next word.
