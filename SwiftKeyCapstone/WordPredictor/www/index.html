@@ -1,0 +1,49 @@
+<html>
+
+<head>
+  <title>Next word predictor</title>
+  <script src="shared/jquery.js" type="text/javascript"></script>
+  <script src="shared/shiny.js" type="text/javascript"></script>
+  <link rel="stylesheet" type="text/css" href="shared/shiny.css"/> 
+  <link href="content/styles.css" rel="stylesheet" />
+</head>
+
+
+ 
+<body>
+  <div class="container">
+    <h2>Word Predictor</h2>
+    <div style="position: relative; height: 80px;">
+      <p>
+         <label>This app will try to predict the next few probable words in the sentence. Double click on the word to select.</label><br /> 
+         <input type="text" name="sentence" id="sentence" value="" size="80" style="position: absolute; z-index: 2; background: transparent;" autocomplete="off"/>
+         <input type="text" name="sentence" id="sentencez"  size="80" disabled="disabled" style="position: absolute; z-index: 1; background: transparent;"/>
+      </p>
+    </div>
+    <div id="results" class="results">
+       <pre id="nextWords" class="shiny-text-output" >Initializing... Please wait.</pre> 
+    </div>
+    <br/>
+    <br/>
+    <footer class="footer">
+	<p>Coursera Data Science Specialization - Switkey Capstone Project. Submitted by Dom: <a href="mailto:dxodri at gmail">dxrodri at gmail dot com</a>.</p>
+	<p> App developed using Shiny and text mining packages such as tm and qdap. Source Code available on <a href="https://github.com/dxrodri/datasciencecoursera/tree/master/SwiftKeyCapstone"> Github</a> </p>
+	<p> App presentation is on RPubs at <a href="http://rpubs.com/dxrodri/WordPredictor">RPubs</a> </p>
+     </footer> 
+  </div>
+  <script>
+     $(document).on("dblclick", "pre", function(evt) {
+	  var sen = document.getElementById("sentence");
+	  var senz = document.getElementById("sentencez");
+	  var sel =window.getSelection().toString().trim(); ;
+	  sen.value = sen.value.trim() + " " + sel;
+	  senz.value = sen.value;
+	  $( "#sentence" ).focus();
+     })
+     window.onload = function() { document.getElementById("sentence").focus();
+};
+  </script>
+  
+</body>
+
+</html>

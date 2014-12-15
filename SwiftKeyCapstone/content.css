@@ -1,0 +1,32 @@
+body { font-family: sans-serif; font-size: 14px; line-height: 1.6em; margin: 0; padding: 0; background-image: url(http://dxrodri.github.io/www/images/image2.jpg);no-repeat center center fixed; 
+        -webkit-background-size: cover;
+        -moz-background-size: cover;
+        -o-background-size: cover;
+        background-size: cover;}
+.footer {
+    position: fixed; top: 100%;
+    text-align:center; width:100%;
+}
+.midcenter {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+}
+.section .reveal .state-background {
+    background-image: url(http://dxrodri.github.io/www/images/image2.jpg);no-repeat center center fixed; 
+        -webkit-background-size: cover;
+        -moz-background-size: cover;
+        -o-background-size: cover;
+        background-size: cover;}
+.section .reveal h1,
+.section .reveal p {
+    color: black;
+    position: relative;
+    top: 15%;}
+
+.reveal h3{
+   position: relative;
+   top: 22%;
+   left: 0%;}
+
+
