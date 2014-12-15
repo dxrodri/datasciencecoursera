@@ -1,6 +1,7 @@
 
 
 #http://www.grsampson.net/D_SGT.c
+#SGT function below was used from the site below after fixing a small change to handle a edge case.
 #http://rstudio-pubs-static.s3.amazonaws.com/33754_4d463ac84bd24721bb9fe6a707ef6236.html
 SimpleGT <- function(table_N){
   #Simple Good Turing Algorithm - Gale And Simpson
